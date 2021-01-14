@@ -6,10 +6,14 @@ public class Rocket : MonoBehaviour
     [SerializeField] float boostForce = 1f;
     [SerializeField] float rotationForce = 1f;
     [SerializeField] float loadDelay = 1f;
+    [SerializeField] AudioClip mainEngineSound;
+    [SerializeField] AudioClip explosionSound;
+    [SerializeField] AudioClip successSound;
+    [SerializeField] ParticleSystem mainEnginePS;
+    [SerializeField] ParticleSystem explosionPS;
+    [SerializeField] ParticleSystem successPS;
 
     // Cached Variables
-    enum State { alive, suspended, dead};
-    State state;
     private float horizontalRotation;
 
     // Cached References
@@ -17,47 +21,54 @@ public class Rocket : MonoBehaviour
     AudioSource audioSource;
     SceneManager sceneManager;
 
+    // Cached States
+    private bool inPlayMode = true;
+    private bool isInvencible = false;
+
     // Start is called before the first frame update
     void Start()
     {
         rigidBody = GetComponent<Rigidbody>();
         audioSource = GetComponent<AudioSource>();
 
-        state = State.alive;
+        inPlayMode = true;
     }
 
     // Update is called once per frame
     void Update()
     {
-        if (state == State.alive)
+        ForceInvincibilityToRocket();
+
+        if (inPlayMode)
         {
-            GetMouseInput();
-            GetHorizontalInput();
+            GetThrustInput();
+            GetRotationInput();
         }
     }
 
-    private void GetMouseInput()
+    private void GetThrustInput()
     {
         if (Input.GetButton("Fire1"))
         {
             // Relative Force adds the thrust in Local coordinates.
-            rigidBody.AddRelativeForce(Vector3.up * boostForce);
+            rigidBody.AddRelativeForce(Vector3.up * boostForce * Time.deltaTime);
             if (!audioSource.isPlaying)
             {
-                audioSource.Play();
+                PlayOneShotAudio(mainEngineSound);
+                mainEnginePS.Play();
             }
         }
         else
         {
             audioSource.Stop();
+            mainEnginePS.Stop();
         }
     }
 
-    private void GetHorizontalInput()
+    private void GetRotationInput()
     {
-        rigidBody.freezeRotation = true;
+        rigidBody.angularVelocity = Vector3.zero;
         horizontalRotation = Input.GetAxisRaw("Horizontal");
-        rigidBody.freezeRotation = false;
     }
 
     private void FixedUpdate()
@@ -72,7 +83,7 @@ public class Rocket : MonoBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
-        if (state != State.alive) { return; }
+        if (!inPlayMode || isInvencible) { return; }
 
         switch (collision.gameObject.tag)
         {
@@ -81,18 +92,17 @@ public class Rocket : MonoBehaviour
                 break;
             case "Finish":
                 SuspendPlayer();
-                Invoke("FinishLevel", loadDelay);
+                Invoke("FinishLevel", successSound.length);
                 break;
             default:
-                Debug.Log("Test");
                 KillPlayer();
-                Invoke("ReloadLevel", loadDelay) ;
+                Invoke("ReloadLevel", explosionSound.length) ;
                 break;
         }
     }
 
     private void FinishLevel()
-    {
+    {   
         sceneManager = FindObjectOfType<SceneManager>();
         sceneManager.LoadNextScene();
     }
@@ -105,13 +115,44 @@ public class Rocket : MonoBehaviour
 
     private void KillPlayer()
     {
-        state = State.dead;
-        audioSource.Stop();
+        PlayOneShotAudio(explosionSound);
+        explosionPS.Play();
+        inPlayMode = false;
+        UnpackRocket();
     }
 
     private void SuspendPlayer()
     {
-        state = State.suspended;
+        PlayOneShotAudio(successSound);
+        successPS.Play();
+        inPlayMode = false;
+    }
+
+    private void PlayOneShotAudio(AudioClip audioClip)
+    {
         audioSource.Stop();
+        audioSource.PlayOneShot(audioClip);
+    }
+
+    private void UnpackRocket()
+    {
+        var _childCount = gameObject.transform.childCount;
+        for (int i = 0; i < _childCount; i++)
+        {
+            var _child = gameObject.transform.GetChild(i);
+            _child.gameObject.AddComponent<Rigidbody>();
+        }
+        gameObject.transform.DetachChildren();
+    }
+
+    private void ForceInvincibilityToRocket()
+    {
+        if (Debug.isDebugBuild)
+        {
+            if (Input.GetKeyDown(KeyCode.C))
+            {
+                isInvencible = !isInvencible;
+            }
+        }
     }
 }

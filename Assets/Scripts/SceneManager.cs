@@ -14,6 +14,11 @@ public class SceneManager : MonoBehaviour
         GetCurrentScene();
     }
 
+    private void Update()
+    {
+        ForceLoadNextLevel();
+    }
+
     private void SetUpSingleton()
     {
         sceneManager = FindObjectsOfType<SceneManager>();
@@ -44,5 +49,24 @@ public class SceneManager : MonoBehaviour
     private void GetCurrentScene()
     {
         currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex;
+    }
+
+    private void ForceLoadNextLevel()
+    {
+        if (Debug.isDebugBuild)
+        {
+            if (Input.GetKeyDown(KeyCode.L))
+            {
+                GetCurrentScene();
+                int nextSceneIndex = currentScene + 1;
+
+                if (nextSceneIndex >= UnityEngine.SceneManagement.SceneManager.sceneCountInBuildSettings)
+                {
+                    nextSceneIndex = 0;
+                }
+
+                UnityEngine.SceneManagement.SceneManager.LoadScene(nextSceneIndex);
+            }
+        }
     }
 }
